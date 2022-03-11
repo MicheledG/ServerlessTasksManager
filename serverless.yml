@@ -1,0 +1,61 @@
+service: tasks-manager
+
+frameworkVersion: ">=2.24.0"
+
+provider:
+  name: aws
+  runtime: python3.8
+  environment:
+    DYNAMODB_TABLE: hello
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource: "*"
+  httpApi:
+    cors: true
+
+functions:
+  create:
+    handler: src/tasks_manager/create.create
+    events:
+      - httpApi:
+          path: /tasks
+          method: post
+
+  list:
+    handler: src/tasks_manager/tasks/list.list
+    events:
+      - httpApi:
+          path: /tasks
+          method: get
+
+  delete:
+    handler: tasks/delete.delete
+    events:
+      - httpApi:
+          path: /tasks/{id}
+          method: delete
+
+resources:
+  Resources:
+    TasksDynamoDbTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.DYNAMODB_TABLE}
