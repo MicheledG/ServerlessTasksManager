@@ -1,6 +1,10 @@
 service: tasks-manager
 configValidationMode: error
 frameworkVersion: ">=2.24.0"
+package:
+  individually: true
+  patterns:
+    - '!*/**'
 
 plugins:
   - serverless-python-requirements
@@ -33,6 +37,10 @@ custom:
 functions:
   createTask:
     handler: src/tasks_manager/create.handler
+    package:
+      patterns:
+        - "!doc"
+        - src/tasks_manager/**
     name: ${self:custom.CreateTaskFunctionName}
     events:
       - httpApi:
@@ -42,6 +50,9 @@ functions:
 
   listTasks:
     handler: src/tasks_manager/list.handler
+    package:
+      patterns:
+        - src/tasks_manager/**
     name: ${self:custom.ListTasksFunctionName}
     events:
       - httpApi:
@@ -51,6 +62,9 @@ functions:
 
   deleteTask:
     handler: src/tasks_manager/delete.handler
+    package:
+      patterns:
+        - src/tasks_manager/**
     name: ${self:custom.DeleteTaskFunctionName}
     events:
       - httpApi:

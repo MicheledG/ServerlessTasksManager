@@ -1,7 +1,7 @@
 import json
 import os
 
-from tasks_manager import decimalencoder
+from src.tasks_manager import decimalencoder
 import boto3
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(os.environ['DYNAMODB_TABLE'])
