@@ -5,7 +5,7 @@ dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(os.environ['DYNAMODB_TABLE'])
 
 
-def delete(event, context):
+def handler(event, context):
     # delete the task from the database
     table.delete_item(
         Key={

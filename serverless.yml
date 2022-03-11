@@ -1,12 +1,15 @@
 service: tasks-manager
-
+configValidationMode: error
 frameworkVersion: ">=2.24.0"
 
+plugins:
+  - serverless-python-requirements
 provider:
   name: aws
   runtime: python3.8
+  memorySize: 128
   environment:
-    DYNAMODB_TABLE: hello
+    DYNAMODB_TABLE: ${self:service}-${sls:stage}-tasksStore
   iam:
     role:
       statements:
@@ -18,37 +21,50 @@ provider:
             - dynamodb:PutItem
             - dynamodb:UpdateItem
             - dynamodb:DeleteItem
-          Resource: "*"
+          Resource: !GetAtt TasksDynamoDbTable.Arn
   httpApi:
     cors: true
 
+custom:
+  CreateTaskFunctionName: ${self:service}-${sls:stage}-createTask
+  ListTasksFunctionName: ${self:service}-${sls:stage}-listTasks
+  DeleteTaskFunctionName: ${self:service}-${sls:stage}-deleteTask
+
 functions:
-  create:
-    handler: src/tasks_manager/create.create
+  createTask:
+    handler: src/tasks_manager/create.handler
+    name: ${self:custom.CreateTaskFunctionName}
     events:
       - httpApi:
           path: /tasks
           method: post
+    disableLogs: false
 
-  list:
-    handler: src/tasks_manager/tasks/list.list
+  listTasks:
+    handler: src/tasks_manager/list.handler
+    name: ${self:custom.ListTasksFunctionName}
     events:
       - httpApi:
           path: /tasks
           method: get
+    disableLogs: false
 
-  delete:
-    handler: tasks/delete.delete
+  deleteTask:
+    handler: src/tasks_manager/delete.handler
+    name: ${self:custom.DeleteTaskFunctionName}
     events:
       - httpApi:
           path: /tasks/{id}
           method: delete
+    disableLogs: false
 
 resources:
+  Description: CloudFormation stack containing all the resources for the service ${self:service}, env ${sls:stage}
   Resources:
     TasksDynamoDbTable:
-      Type: 'AWS::DynamoDB::Table'
+      Type: AWS::DynamoDB::Table
       Properties:
+        TableName: ${self:provider.environment.DYNAMODB_TABLE}
         AttributeDefinitions:
           - AttributeName: id
             AttributeType: S
@@ -58,4 +74,21 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-        TableName: ${self:provider.environment.DYNAMODB_TABLE}
+
+    CreateTaskLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: !Sub /aws/lambda/${self:custom.CreateTaskFunctionName}
+        RetentionInDays: 1
+
+    ListTasksLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: /aws/lambda/${self:custom.ListTasksFunctionName}
+        RetentionInDays: 1
+
+    DeleteTaskLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: /aws/lambda/${self:custom.DeleteTaskFunctionName}
+        RetentionInDays: 1

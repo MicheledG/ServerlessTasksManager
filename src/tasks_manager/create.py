@@ -9,7 +9,7 @@ dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(os.environ['DYNAMODB_TABLE'])
 
 
-def create(event, context):
+def handler(event, context):
     data = json.loads(event['body'])
     if 'description' not in data:
         logging.error("Validation Failed")
@@ -20,7 +20,6 @@ def create(event, context):
     item = {
         'id': str(uuid.uuid1()),
         'description': data['description'],
-        'checked': False,
         'createdAt': timestamp,
     }
 
