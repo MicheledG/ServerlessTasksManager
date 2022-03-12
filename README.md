@@ -7,17 +7,20 @@ The service exposes an HTTP REST API to manage "tasks" performing CRUD operation
 
 ## Repo Structure
 
-The repository is structured TODO.
+The repository contains the following resources:
 
-## Service Structure
 
-## Local Environment Setup
+## Service Architecture 
+
+## Service Deployment
+
+### Local Environment Setup
 
 ```bash
 npm install -g serverless
 ```
 
-## Service Deployment
+### Deployment
 
 In order to deploy the endpoint simply first install the needed plugins.
 
@@ -28,8 +31,14 @@ serverless plugin install -n serverless-python-requirements
 Then deploy the service.
 
 ```bash
-serverless deploy [--aws-profile=<your-aws-profile-name>] [--region=<aws-region-name>]
+serverless deploy [--stage=<stage_name>] [--username=<basic_auth_usr>] [--password=<basic_auth_pwd>] [--aws-profile=<your-aws-profile-name>] [--region=<aws-region-name>]
 ```
+
+Below the default values for some optional attributes reported above are listed:
+
+- --stage=dev
+- --username=<stage_name>
+- --password=password
 
 ## Service Testing
 
@@ -38,7 +47,7 @@ You can create, retrieve, or delete tasks with the following commands:
 ### Create a Task
 
 ```bash
-curl -X POST -u <username>:<password> https://XXXXXXX.execute-api.<aws-region-name>.amazonaws.com/<env>/tasks --data '{ "description": "Complete Empatica assignment #02" }'
+curl -X POST -u <basic_auth_usr>:<basic_auth_pwd> https://XXXXXXX.execute-api.<aws-region-name>.amazonaws.com/<stage_name>/tasks --data '{ "description": "Complete Empatica assignment #02" }'
 ```
 
 No output
@@ -46,7 +55,7 @@ No output
 ### List all Tasks
 
 ```bash
-curl -u <username>:<password> https://XXXXXXX.execute-api.<aws-region-name>.amazonaws.com/<stage>/tasks 
+curl -u <username>:<password> https://XXXXXXX.execute-api.<aws-region-name>.amazonaws.com/<stage_name>/tasks 
 ```
 
 Example output:
@@ -58,16 +67,19 @@ Example output:
 
 ```bash
 # Replace the <id> part with a real id from your todos table
-curl -X DELETE -u <username>:<password> https://XXXXXXX.execute-api.<aws-region-name>.amazonaws.com/<stage>/tasks/<id>
+curl -X DELETE -u <username>:<password> https://XXXXXXX.execute-api.<aws-region-name>.amazonaws.com/<stage_name>/tasks/<id>
 ```
 
 No output
 
 ## Service improvements
 
+This section reports some improvements that should be applied to the current solution in order to have better 
+maintainability, more security, and increased observability. 
+
 ### Basic Authorizer
 
-Currently, "username" and "password" are stored as environment variables of the authorizer lambda function.
+Currently, "basic_auth_usr" and "basic_auth_pwd" are stored as environment variables of the authorizer lambda function.
 Two suggestions here are reported:
 - increasing security of the environment variables using a KMS key to cipher them, as result only specific AWS IAM Users
   could see the values of the variables
@@ -78,11 +90,22 @@ Two suggestions here are reported:
 
 ### ES Domain
 
-- For real production domains it is suggested to use dedicated master nodes (3 of them) and more than 1 data node.
+For real production domains it is suggested to use dedicated master nodes (3 of them) and more than 1 data node.
+
+Moreover a more secured network configuration should be applied, see [VPC](#vpc-configuration) section. 
 
 ### API Gateway Logging
 
-- TODO
+Currently only Lambda Function's log groups have subscriptions forwarding logs to the Elastic Search domain.
+It would be possible to specify dedicated CloudWatch log groups also for API Gateway resources and forward these  
+logs to ES.
+
+### VPC configuration
+
+The implemented solution does not use any dedicated VPC set-up, all the resources are created in the default VPC which 
+has public subnets.
+
+It is recommended to create ad hoc network configurations based on project requirements. 
 
 ### Environment Mgmt
 

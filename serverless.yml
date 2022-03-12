@@ -124,7 +124,7 @@ resources:
         # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
         FilterPattern: " "
         LogGroupName: !Ref CreateTaskLogGroup
-        RoleArn: !GetAtt LogsStoreWriterRole.Arn
+#        RoleArn: !GetAtt LogsStoreWriterRole.Arn
 
     ListTasksLogGroup:
       Type: AWS::Logs::LogGroup
@@ -139,7 +139,7 @@ resources:
         # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
         FilterPattern: " "
         LogGroupName: !Ref ListTasksLogGroup
-        RoleArn: !GetAtt LogsStoreWriterRole.Arn
+#        RoleArn: !GetAtt LogsStoreWriterRole.Arn
 
     DeleteTaskLogGroup:
       Type: AWS::Logs::LogGroup
@@ -154,7 +154,7 @@ resources:
         # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
         FilterPattern: " "
         LogGroupName: !Ref DeleteTaskLogGroup
-        RoleArn: !GetAtt LogsStoreWriterRole.Arn
+#        RoleArn: !GetAtt LogsStoreWriterRole.Arn
 
     LogsStoreOpenSearchDomain:
       Type: AWS::OpenSearchService::Domain

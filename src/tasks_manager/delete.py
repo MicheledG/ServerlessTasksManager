@@ -6,16 +6,21 @@ table = dynamodb.Table(os.environ['DYNAMODB_TABLE'])
 
 
 def handler(event, context):
-    # delete the task from the database
-    table.delete_item(
-        Key={
-            'id': event['pathParameters']['id']
-        }
-    )
-
-    # create a response
+    # extract task id param from the request
+    task_id = event.get('pathParameters', dict()).get('id')
+    if task_id is None:
+        # missing task id in the request
+        status_code = 400
+    else:
+        # deleting task_id from the database
+        table.delete_item(
+            Key={
+                'id': task_id
+            }
+        )
+        status_code = 202
+    # create the response
     response = {
-        "statusCode": 200
+        "statusCode": status_code
     }
-
     return response
