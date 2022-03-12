@@ -15,6 +15,7 @@ custom:
   ListTasksFunctionName: ${self:service}-${sls:stage}-listtasks
   DeleteTaskFunctionName: ${self:service}-${sls:stage}-deletetask
   BasicAuthorizerFunctionName: ${self:service}-${sls:stage}-basicauthorizer
+  KFSTransformerFunctionName: ${self:service}-${sls:stage}-kfstransformer
   LogsFirehoseDeliveryStreamName: ${self:service}-${sls:stage}-logsdeliverystream
   FailedLogsBackupS3BucketName: ${self:service}-${sls:stage}-logsbackup
   LogsStoreOpenSearchDomainName: ${self:service}-${sls:stage}-logsstore
@@ -104,6 +105,14 @@ functions:
       BASIC_AUTH_USERNAME: ${opt:username, sls:stage}
       BASIC_AUTH_PASSWORD: ${opt:password, "password"}
 
+  kfsTransformer:
+    handler: src/kfs_transformer/transformer.lambda_handler
+    memorySize: 512
+    package:
+      patterns:
+        - src/kfs_transformer/**
+    name: ${self:custom.KFSTransformerFunctionName}
+
 resources:
   Description: CloudFormation stack containing all the resources for the service ${self:service}, env ${sls:stage}
   Resources:
@@ -190,6 +199,12 @@ resources:
         RoleArn: !GetAtt LogsSubscriptionsRole.Arn
         LogGroupName: !Ref BasicAuthorizerLogGroup
 
+    KFSTransformerLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: !Sub /aws/lambda/${self:custom.KFSTransformerFunctionName}
+        RetentionInDays: 1
+
     LogsFirehoseDeliveryStream:
       Type: AWS::KinesisFirehose::DeliveryStream
       Properties:
@@ -203,6 +218,13 @@ resources:
             SizeInMBs: 1
           DomainARN: !GetAtt LogsStoreOpenSearchDomain.Arn
           RoleARN: !GetAtt LogsFirehoseDeliveryStreamRole.Arn
+          ProcessingConfiguration:
+            Enabled: true
+            Processors:
+              - Type: Lambda
+                Parameters:
+                  - ParameterName: LambdaArn
+                    ParameterValue: !GetAtt KFSTransformerLambdaFunction.Arn
           S3BackupMode: FailedDocumentsOnly
           S3Configuration:
             BucketARN: !GetAtt FailedLogsBackupS3Bucket.Arn
