@@ -38,7 +38,7 @@ You can create, retrieve, or delete tasks with the following commands:
 ### Create a Task
 
 ```bash
-curl -X POST https://XXXXXXX.execute-api.<aws-region-name>.amazonaws.com/<env>/tasks --data '{ "description": "Complete Empatica assignment #02" }'
+curl -X POST -u <username>:<password> https://XXXXXXX.execute-api.<aws-region-name>.amazonaws.com/<env>/tasks --data '{ "description": "Complete Empatica assignment #02" }'
 ```
 
 No output
@@ -46,7 +46,7 @@ No output
 ### List all Tasks
 
 ```bash
-curl https://XXXXXXX.execute-api.us-east-1.amazonaws.com/dev/todos
+curl -u <username>:<password> https://XXXXXXX.execute-api.<aws-region-name>.amazonaws.com/<stage>/tasks 
 ```
 
 Example output:
@@ -58,7 +58,35 @@ Example output:
 
 ```bash
 # Replace the <id> part with a real id from your todos table
-curl -X DELETE https://XXXXXXX.execute-api.<aws-region-name>.amazonaws.com/dev/tasks/<id>
+curl -X DELETE -u <username>:<password> https://XXXXXXX.execute-api.<aws-region-name>.amazonaws.com/<stage>/tasks/<id>
 ```
 
 No output
+
+## Service improvements
+
+### Basic Authorizer
+
+Currently, "username" and "password" are stored as environment variables of the authorizer lambda function.
+Two suggestions here are reported:
+- increasing security of the environment variables using a KMS key to cipher them, as result only specific AWS IAM Users
+  could see the values of the variables
+- moving sensitive information into Secrets Manager and let the authorizer lambda function retrieve the values. 
+  WARNING: since secrets manager could have relevant costs it is suggested to "cache" inside the lambda function the 
+  retrieved values. To obtain this result put the reading from secrets manager operation at the very beginning of lambda 
+  function code (before handler code)
+
+### ES Domain
+
+- For real production domains it is suggested to use dedicated master nodes (3 of them) and more than 1 data node.
+
+### API Gateway Logging
+
+- TODO
+
+### Environment Mgmt
+
+The serverless.yml template is not differentiating resources configuration (such as: Lambda Function MEM, ES Domain 
+nodes) per environment.
+This approach should be improved using native Cloudformation "Mapping" strategy, or other Serverless tool features, 
+correctly dimensioning resources considering the target environment.

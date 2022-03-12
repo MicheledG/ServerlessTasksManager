@@ -5,6 +5,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "serverless-plugin-encode-env-var-objects": "^1.1.0",
     "serverless-python-requirements": "^5.3.1"
   }
 }

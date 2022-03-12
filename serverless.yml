@@ -8,12 +8,21 @@ package:
 
 plugins:
   - serverless-python-requirements
+
+custom:
+  TasksDynamoDbTableName: ${self:service}-${sls:stage}-tasksstore
+  CreateTaskFunctionName: ${self:service}-${sls:stage}-createtask
+  ListTasksFunctionName: ${self:service}-${sls:stage}-listtasks
+  DeleteTaskFunctionName: ${self:service}-${sls:stage}-deletetask
+  LogsStoreOpenSearchDomainName: ${self:service}-${sls:stage}-logsstore
+  BasicAuthorizerFunctionName: ${self:service}-${sls:stage}-basicauthorizer
+
 provider:
   name: aws
   runtime: python3.8
   memorySize: 128
   environment:
-    DYNAMODB_TABLE: ${self:service}-${sls:stage}-tasksStore
+    DYNAMODB_TABLE: ${self:custom.TasksDynamoDbTableName}
   iam:
     role:
       statements:
@@ -28,11 +37,14 @@ provider:
           Resource: !GetAtt TasksDynamoDbTable.Arn
   httpApi:
     cors: true
-
-custom:
-  CreateTaskFunctionName: ${self:service}-${sls:stage}-createTask
-  ListTasksFunctionName: ${self:service}-${sls:stage}-listTasks
-  DeleteTaskFunctionName: ${self:service}-${sls:stage}-deleteTask
+    authorizers:
+      customAuthorizer:
+        type: request
+        functionName: basicAuthorizerFunc
+        resultTtlInSeconds: 3600
+        # enable new format of Lambda Authorizer Response Format (2.0): https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-lambda-authorizer.html
+        enableSimpleResponses: true
+        identitySource: "$request.header.Authorization"
 
 functions:
   createTask:
@@ -72,6 +84,16 @@ functions:
           method: delete
     disableLogs: false
 
+  basicAuthorizerFunc:
+    handler: src/basic_authorizer/authorize.handler
+    package:
+      patterns:
+        - src/basic_authorizer/**
+    name: ${self:custom.BasicAuthorizerFunctionName}
+    environment:
+      BASIC_AUTH_USERNAME: ${opt:username, sls:stage}
+      BASIC_AUTH_PASSWORD: ${opt:password, "password"}
+
 resources:
   Description: CloudFormation stack containing all the resources for the service ${self:service}, env ${sls:stage}
   Resources:
@@ -95,14 +117,92 @@ resources:
         LogGroupName: !Sub /aws/lambda/${self:custom.CreateTaskFunctionName}
         RetentionInDays: 1
 
+    CreateTaskLogSubscription:
+      Type: AWS::Logs::SubscriptionFilter
+      Properties:
+        DestinationArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
+        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
+        FilterPattern: " "
+        LogGroupName: !Ref CreateTaskLogGroup
+        RoleArn: !GetAtt LogsStoreWriterRole.Arn
+
     ListTasksLogGroup:
       Type: AWS::Logs::LogGroup
       Properties:
         LogGroupName: /aws/lambda/${self:custom.ListTasksFunctionName}
         RetentionInDays: 1
 
+    ListTasksLogSubscription:
+      Type: AWS::Logs::SubscriptionFilter
+      Properties:
+        DestinationArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
+        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
+        FilterPattern: " "
+        LogGroupName: !Ref ListTasksLogGroup
+        RoleArn: !GetAtt LogsStoreWriterRole.Arn
+
     DeleteTaskLogGroup:
       Type: AWS::Logs::LogGroup
       Properties:
         LogGroupName: /aws/lambda/${self:custom.DeleteTaskFunctionName}
         RetentionInDays: 1
+
+    DeleteTaskLogSubscription:
+      Type: AWS::Logs::SubscriptionFilter
+      Properties:
+        DestinationArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
+        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
+        FilterPattern: " "
+        LogGroupName: !Ref DeleteTaskLogGroup
+        RoleArn: !GetAtt LogsStoreWriterRole.Arn
+
+    LogsStoreOpenSearchDomain:
+      Type: AWS::OpenSearchService::Domain
+      Properties:
+        DomainName: ${self:custom.LogsStoreOpenSearchDomainName}
+        EngineVersion: Elasticsearch_7.10
+        ClusterConfig:
+          DedicatedMasterEnabled: false
+          InstanceCount: 1
+          ZoneAwarenessEnabled: false
+          InstanceType: 'm3.medium.search'
+        EBSOptions:
+          EBSEnabled: true
+          VolumeSize: '10'
+          VolumeType: 'gp2'
+        AccessPolicies:
+          # WARNING: Providing public access, not acceptable for real scenarios
+          Version: '2012-10-17'
+          Statement:
+            - Effect: 'Allow'
+              Action:
+                - "es:*"
+              Principal:
+                AWS: "*"
+              Condition:
+                IpAddress:
+                  aws:SourceIp: "*"
+              Resource: !Sub arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${self:custom.LogsStoreOpenSearchDomainName}/*
+
+    LogsStoreWriterRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Principal:
+                Service:
+                  - "lambda.amazonaws.com"
+              Action:
+                - "sts:AssumeRole"
+        RoleName: ${self:service}-${sls:stage}-logsstorewriter
+        Policies:
+          - PolicyName: es-access
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Action:
+                    - "*"
+                  Effect: Allow
+                  Resource: !Sub ${LogsStoreOpenSearchDomain.Arn}/*
