@@ -127,13 +127,14 @@ resources:
         LogGroupName: !Sub /aws/lambda/${self:custom.CreateTaskFunctionName}
         RetentionInDays: 1
 
-#    CreateTaskLogSubscription:
-#      Type: AWS::Logs::SubscriptionFilter
-#      Properties:
-#        DestinationArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
-#        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
-#        FilterPattern: " "
-#        LogGroupName: !Ref CreateTaskLogGroup
+    CreateTaskLogSubscription:
+      Type: AWS::Logs::SubscriptionFilter
+      Properties:
+        DestinationArn: !GetAtt LogsFirehoseDeliveryStream.Arn
+        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
+        FilterPattern: " "
+        RoleArn: !GetAtt LogsSubscriptionsRole.Arn
+        LogGroupName: !Ref CreateTaskLogGroup
 
     CreateTaskSubscriptionInvokeLambdaPermission:
       Type: AWS::Lambda::Permission
@@ -150,13 +151,14 @@ resources:
         LogGroupName: /aws/lambda/${self:custom.ListTasksFunctionName}
         RetentionInDays: 1
 
-#    ListTasksLogSubscription:
-#      Type: AWS::Logs::SubscriptionFilter
-#      Properties:
-#        DestinationArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
-#        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
-#        FilterPattern: " "
-#        LogGroupName: !Ref ListTasksLogGroup
+    ListTasksLogSubscription:
+      Type: AWS::Logs::SubscriptionFilter
+      Properties:
+        DestinationArn: !GetAtt LogsFirehoseDeliveryStream.Arn
+        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
+        FilterPattern: " "
+        RoleArn: !GetAtt LogsSubscriptionsRole.Arn
+        LogGroupName: !Ref ListTasksLogGroup
 
     DeleteTaskLogGroup:
       Type: AWS::Logs::LogGroup
@@ -164,13 +166,14 @@ resources:
         LogGroupName: /aws/lambda/${self:custom.DeleteTaskFunctionName}
         RetentionInDays: 1
 
-#    DeleteTaskLogSubscription:
-#      Type: AWS::Logs::SubscriptionFilter
-#      Properties:
-#        DestinationArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
-#        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
-#        FilterPattern: " "
-#        LogGroupName: !Ref DeleteTaskLogGroup
+    DeleteTaskLogSubscription:
+      Type: AWS::Logs::SubscriptionFilter
+      Properties:
+        DestinationArn: !GetAtt LogsFirehoseDeliveryStream.Arn
+        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
+        FilterPattern: " "
+        RoleArn: !GetAtt LogsSubscriptionsRole.Arn
+        LogGroupName: !Ref DeleteTaskLogGroup
 
     BasicAuthorizerLogGroup:
       Type: AWS::Logs::LogGroup
@@ -178,47 +181,14 @@ resources:
         LogGroupName: !Sub /aws/lambda/${self:custom.BasicAuthorizerFunctionName}
         RetentionInDays: 1
 
-#    BasicAuthorizerLogSubscription:
-#      Type: AWS::Logs::SubscriptionFilter
-#      Properties:
-#        DestinationArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
-#        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
-#        FilterPattern: " "
-#        LogGroupName: !Ref BasicAuthorizerLogGroup
-
-    LogsFirehoseDeliveryStreamRole:
-      Type: AWS::IAM::Role
+    BasicAuthorizerLogSubscription:
+      Type: AWS::Logs::SubscriptionFilter
       Properties:
-        Description: Allows kinesis firehose to store logs on ES and backup on S3
-        AssumeRolePolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Principal:
-                Service:
-                  - firehose.amazonaws.com
-              Action:
-                - 'sts:AssumeRole'
-        Policies:
-          - PolicyName: inline-policy
-            PolicyDocument:
-              Version: '2012-10-17'
-              Statement:
-                - Sid: FullAccessOnES
-                  Effect: Allow
-                  Action:
-                    - 'es:*'
-                  Resource: "*"
-                - Sid: FullAccessOnS3
-                  Effect: Allow
-                  Action:
-                    - 's3:*'
-                  Resource: "*"
-                - Sid: FullAccessOnLambda
-                  Effect: Allow
-                  Action:
-                    - 'lambda:*'
-                  Resource: "*"
+        DestinationArn: !GetAtt LogsFirehoseDeliveryStream.Arn
+        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
+        FilterPattern: " "
+        RoleArn: !GetAtt LogsSubscriptionsRole.Arn
+        LogGroupName: !Ref BasicAuthorizerLogGroup
 
     LogsFirehoseDeliveryStream:
       Type: AWS::KinesisFirehose::DeliveryStream
@@ -274,3 +244,61 @@ resources:
                 IpAddress:
                   aws:SourceIp: "*"
               Resource: !Sub arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${self:custom.LogsStoreOpenSearchDomainName}/*
+
+    LogsSubscriptionsRole:
+      Type: AWS::IAM::Role
+      Properties:
+        Description: Allows CloudWatch to send logs to KFS
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - !Sub logs.${AWS::Region}.amazonaws.com
+              Action:
+                - 'sts:AssumeRole'
+        Policies:
+          - PolicyName: inline-policy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Sid: FullAccessOnFirehose
+                  Effect: Allow
+                  Action:
+                    - 'firehose:*'
+                  Resource: !GetAtt LogsFirehoseDeliveryStream.Arn
+
+    LogsFirehoseDeliveryStreamRole:
+      Type: AWS::IAM::Role
+      Properties:
+        Description: Allows kinesis firehose to store logs on ES and backup on S3
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - firehose.amazonaws.com
+              Action:
+                - 'sts:AssumeRole'
+        Policies:
+          - PolicyName: inline-policy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Sid: FullAccessOnES
+                  Effect: Allow
+                  Action:
+                    - 'es:*'
+                  Resource: "*"
+                - Sid: FullAccessOnS3
+                  Effect: Allow
+                  Action:
+                    - 's3:*'
+                  Resource: "*"
+                - Sid: FullAccessOnLambda
+                  Effect: Allow
+                  Action:
+                    - 'lambda:*'
+                  Resource: "*"
