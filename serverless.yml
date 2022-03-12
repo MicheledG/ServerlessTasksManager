@@ -14,8 +14,10 @@ custom:
   CreateTaskFunctionName: ${self:service}-${sls:stage}-createtask
   ListTasksFunctionName: ${self:service}-${sls:stage}-listtasks
   DeleteTaskFunctionName: ${self:service}-${sls:stage}-deletetask
-  LogsStoreOpenSearchDomainName: ${self:service}-${sls:stage}-logsstore
   BasicAuthorizerFunctionName: ${self:service}-${sls:stage}-basicauthorizer
+  LogsStoreOpenSearchDomainName: ${self:service}-${sls:stage}-logsstore
+  pythonRequirements:
+    dockerizePip: true
 
 provider:
   name: aws
@@ -23,6 +25,9 @@ provider:
   memorySize: 128
   environment:
     DYNAMODB_TABLE: ${self:custom.TasksDynamoDbTableName}
+    LOG_LEVEL: ${opt:log_level, "DEBUG"}
+    POWERTOOLS_SERVICE_NAME: ${self:service}
+    POWERTOOLS_LOGGER_LOG_EVENT: ${opt:log_event, "TRUE"}
   iam:
     role:
       statements:
@@ -38,10 +43,10 @@ provider:
   httpApi:
     cors: true
     authorizers:
-      customAuthorizer:
+      basicAuthorizer:
         type: request
-        functionName: basicAuthorizerFunc
-        resultTtlInSeconds: 3600
+        functionName: basicAuthorizer
+        resultTtlInSeconds: 5
         # enable new format of Lambda Authorizer Response Format (2.0): https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-lambda-authorizer.html
         enableSimpleResponses: true
         identitySource: "$request.header.Authorization"
@@ -58,7 +63,8 @@ functions:
       - httpApi:
           path: /tasks
           method: post
-    disableLogs: false
+          authorizer:
+            name: basicAuthorizer
 
   listTasks:
     handler: src/tasks_manager/list.handler
@@ -70,7 +76,8 @@ functions:
       - httpApi:
           path: /tasks
           method: get
-    disableLogs: false
+          authorizer:
+            name: basicAuthorizer
 
   deleteTask:
     handler: src/tasks_manager/delete.handler
@@ -82,9 +89,10 @@ functions:
       - httpApi:
           path: /tasks/{id}
           method: delete
-    disableLogs: false
+          authorizer:
+            name: basicAuthorizer
 
-  basicAuthorizerFunc:
+  basicAuthorizer:
     handler: src/basic_authorizer/authorize.handler
     package:
       patterns:
@@ -124,7 +132,15 @@ resources:
         # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
         FilterPattern: " "
         LogGroupName: !Ref CreateTaskLogGroup
-#        RoleArn: !GetAtt LogsStoreWriterRole.Arn
+
+    CreateTaskSubscriptionInvokeLambdaPermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
+        Action: lambda:InvokeFunction
+        Principal: logs.amazonaws.com
+        SourceAccount: !Ref AWS::AccountId
+        SourceArn: !GetAtt CreateTaskLogGroup.Arn
 
     ListTasksLogGroup:
       Type: AWS::Logs::LogGroup
@@ -139,7 +155,15 @@ resources:
         # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
         FilterPattern: " "
         LogGroupName: !Ref ListTasksLogGroup
-#        RoleArn: !GetAtt LogsStoreWriterRole.Arn
+
+    ListTasksSubscriptionInvokeLambdaPermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
+        Action: lambda:InvokeFunction
+        Principal: logs.amazonaws.com
+        SourceAccount: !Ref AWS::AccountId
+        SourceArn: !GetAtt ListTasksLogGroup.Arn
 
     DeleteTaskLogGroup:
       Type: AWS::Logs::LogGroup
@@ -154,7 +178,38 @@ resources:
         # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
         FilterPattern: " "
         LogGroupName: !Ref DeleteTaskLogGroup
-#        RoleArn: !GetAtt LogsStoreWriterRole.Arn
+
+    DeleteTaskSubscriptionInvokeLambdaPermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
+        Action: lambda:InvokeFunction
+        Principal: logs.amazonaws.com
+        SourceAccount: !Ref AWS::AccountId
+        SourceArn: !GetAtt DeleteTaskLogGroup.Arn
+
+    BasicAuthorizerLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: !Sub /aws/lambda/${self:custom.BasicAuthorizerFunctionName}
+        RetentionInDays: 1
+
+    BasicAuthorizerLogSubscription:
+      Type: AWS::Logs::SubscriptionFilter
+      Properties:
+        DestinationArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
+        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
+        FilterPattern: " "
+        LogGroupName: !Ref BasicAuthorizerLogGroup
+
+    BasicAuthorizerSubscriptionInvokeLambdaPermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
+        Action: lambda:InvokeFunction
+        Principal: logs.amazonaws.com
+        SourceAccount: !Ref AWS::AccountId
+        SourceArn: !GetAtt BasicAuthorizerLogGroup.Arn
 
     LogsStoreOpenSearchDomain:
       Type: AWS::OpenSearchService::Domain
@@ -171,7 +226,6 @@ resources:
           VolumeSize: '10'
           VolumeType: 'gp2'
         AccessPolicies:
-          # WARNING: Providing public access, not acceptable for real scenarios
           Version: '2012-10-17'
           Statement:
             - Effect: 'Allow'
@@ -183,26 +237,3 @@ resources:
                 IpAddress:
                   aws:SourceIp: "*"
               Resource: !Sub arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${self:custom.LogsStoreOpenSearchDomainName}/*
-
-    LogsStoreWriterRole:
-      Type: AWS::IAM::Role
-      Properties:
-        AssumeRolePolicyDocument:
-          Version: "2012-10-17"
-          Statement:
-            - Effect: "Allow"
-              Principal:
-                Service:
-                  - "lambda.amazonaws.com"
-              Action:
-                - "sts:AssumeRole"
-        RoleName: ${self:service}-${sls:stage}-logsstorewriter
-        Policies:
-          - PolicyName: es-access
-            PolicyDocument:
-              Version: "2012-10-17"
-              Statement:
-                - Action:
-                    - "*"
-                  Effect: Allow
-                  Resource: !Sub ${LogsStoreOpenSearchDomain.Arn}/*

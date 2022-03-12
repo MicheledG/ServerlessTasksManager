@@ -14,7 +14,11 @@ The repository contains the following resources:
 
 ## Service Deployment
 
-### Local Environment Setup
+### Prerequisites
+
+#### Serverless
+
+Serverless tool must be installed on the computer 
 
 ```bash
 npm install -g serverless
@@ -55,12 +59,12 @@ No output
 ### List all Tasks
 
 ```bash
-curl -u <username>:<password> https://XXXXXXX.execute-api.<aws-region-name>.amazonaws.com/<stage_name>/tasks 
+curl -u <username>:<password> https://XXXXXXX.execute-api.<aws-region-name>.amazonaws.com/<stage_name>/tasks[?limit=<integer>&next_page=<next_page string obtained in previous response>] 
 ```
 
 Example output:
 ```bash
-[{"description":"Complete Empatica assignment #02","id":"ac90feaa11e6-9ede-afdfa051af86","createdAt":1479139961304}]
+{"tasks": [{"description":"Complete Empatica assignment #02","id":"ac90feaa11e6-9ede-afdfa051af86","createdAt":1479139961304}], "size": 1, "next_page": null}
 ```
 
 ### Delete a Task
@@ -90,9 +94,9 @@ Two suggestions here are reported:
 
 ### ES Domain
 
-For real production domains it is suggested to use dedicated master nodes (3 of them) and more than 1 data node.
-
-Moreover a more secured network configuration should be applied, see [VPC](#vpc-configuration) section. 
+- For real production domains it is suggested to use dedicated master nodes (3 of them) and more than 1 data node.
+- A more secured network configuration should be applied, see [VPC](#vpc-configuration) section.
+- indices in ES domain should be defined in order to guarantee rotation and deletion after a specified retention period.
 
 ### API Gateway Logging
 

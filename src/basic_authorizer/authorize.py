@@ -7,7 +7,7 @@ BASIC_AUTH_PASSWORD = os.environ['BASIC_AUTH_PASSWORD']
 
 def handler(event, context):
     # extract request authorization header
-    request_authorization_header = event.get("header", dict()).get("Authorization", "")
+    request_authorization_header = event.get("headers", dict()).get("authorization", "")
     # compute the valid authorization header
     authorization_secret = b64encode(
         f"{BASIC_AUTH_USERNAME}:{BASIC_AUTH_PASSWORD}".encode()
