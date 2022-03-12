@@ -15,6 +15,8 @@ custom:
   ListTasksFunctionName: ${self:service}-${sls:stage}-listtasks
   DeleteTaskFunctionName: ${self:service}-${sls:stage}-deletetask
   BasicAuthorizerFunctionName: ${self:service}-${sls:stage}-basicauthorizer
+  LogsFirehoseDeliveryStreamName: ${self:service}-${sls:stage}-logsdeliverystream
+  FailedLogsBackupS3BucketName: ${self:service}-${sls:stage}-logsbackup
   LogsStoreOpenSearchDomainName: ${self:service}-${sls:stage}-logsstore
   pythonRequirements:
     dockerizePip: true
@@ -125,13 +127,13 @@ resources:
         LogGroupName: !Sub /aws/lambda/${self:custom.CreateTaskFunctionName}
         RetentionInDays: 1
 
-    CreateTaskLogSubscription:
-      Type: AWS::Logs::SubscriptionFilter
-      Properties:
-        DestinationArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
-        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
-        FilterPattern: " "
-        LogGroupName: !Ref CreateTaskLogGroup
+#    CreateTaskLogSubscription:
+#      Type: AWS::Logs::SubscriptionFilter
+#      Properties:
+#        DestinationArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
+#        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
+#        FilterPattern: " "
+#        LogGroupName: !Ref CreateTaskLogGroup
 
     CreateTaskSubscriptionInvokeLambdaPermission:
       Type: AWS::Lambda::Permission
@@ -148,22 +150,13 @@ resources:
         LogGroupName: /aws/lambda/${self:custom.ListTasksFunctionName}
         RetentionInDays: 1
 
-    ListTasksLogSubscription:
-      Type: AWS::Logs::SubscriptionFilter
-      Properties:
-        DestinationArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
-        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
-        FilterPattern: " "
-        LogGroupName: !Ref ListTasksLogGroup
-
-    ListTasksSubscriptionInvokeLambdaPermission:
-      Type: AWS::Lambda::Permission
-      Properties:
-        FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
-        Action: lambda:InvokeFunction
-        Principal: logs.amazonaws.com
-        SourceAccount: !Ref AWS::AccountId
-        SourceArn: !GetAtt ListTasksLogGroup.Arn
+#    ListTasksLogSubscription:
+#      Type: AWS::Logs::SubscriptionFilter
+#      Properties:
+#        DestinationArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
+#        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
+#        FilterPattern: " "
+#        LogGroupName: !Ref ListTasksLogGroup
 
     DeleteTaskLogGroup:
       Type: AWS::Logs::LogGroup
@@ -171,22 +164,13 @@ resources:
         LogGroupName: /aws/lambda/${self:custom.DeleteTaskFunctionName}
         RetentionInDays: 1
 
-    DeleteTaskLogSubscription:
-      Type: AWS::Logs::SubscriptionFilter
-      Properties:
-        DestinationArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
-        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
-        FilterPattern: " "
-        LogGroupName: !Ref DeleteTaskLogGroup
-
-    DeleteTaskSubscriptionInvokeLambdaPermission:
-      Type: AWS::Lambda::Permission
-      Properties:
-        FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
-        Action: lambda:InvokeFunction
-        Principal: logs.amazonaws.com
-        SourceAccount: !Ref AWS::AccountId
-        SourceArn: !GetAtt DeleteTaskLogGroup.Arn
+#    DeleteTaskLogSubscription:
+#      Type: AWS::Logs::SubscriptionFilter
+#      Properties:
+#        DestinationArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
+#        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
+#        FilterPattern: " "
+#        LogGroupName: !Ref DeleteTaskLogGroup
 
     BasicAuthorizerLogGroup:
       Type: AWS::Logs::LogGroup
@@ -194,22 +178,75 @@ resources:
         LogGroupName: !Sub /aws/lambda/${self:custom.BasicAuthorizerFunctionName}
         RetentionInDays: 1
 
-    BasicAuthorizerLogSubscription:
-      Type: AWS::Logs::SubscriptionFilter
-      Properties:
-        DestinationArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
-        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
-        FilterPattern: " "
-        LogGroupName: !Ref BasicAuthorizerLogGroup
+#    BasicAuthorizerLogSubscription:
+#      Type: AWS::Logs::SubscriptionFilter
+#      Properties:
+#        DestinationArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
+#        # Match all: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
+#        FilterPattern: " "
+#        LogGroupName: !Ref BasicAuthorizerLogGroup
 
-    BasicAuthorizerSubscriptionInvokeLambdaPermission:
-      Type: AWS::Lambda::Permission
+    LogsFirehoseDeliveryStreamRole:
+      Type: AWS::IAM::Role
       Properties:
-        FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
-        Action: lambda:InvokeFunction
-        Principal: logs.amazonaws.com
-        SourceAccount: !Ref AWS::AccountId
-        SourceArn: !GetAtt BasicAuthorizerLogGroup.Arn
+        Description: Allows kinesis firehose to store logs on ES and backup on S3
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - firehose.amazonaws.com
+              Action:
+                - 'sts:AssumeRole'
+        Policies:
+          - PolicyName: inline-policy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Sid: FullAccessOnES
+                  Effect: Allow
+                  Action:
+                    - 'es:*'
+                  Resource: "*"
+                - Sid: FullAccessOnS3
+                  Effect: Allow
+                  Action:
+                    - 's3:*'
+                  Resource: "*"
+                - Sid: FullAccessOnLambda
+                  Effect: Allow
+                  Action:
+                    - 'lambda:*'
+                  Resource: "*"
+
+    LogsFirehoseDeliveryStream:
+      Type: AWS::KinesisFirehose::DeliveryStream
+      Properties:
+        DeliveryStreamName: ${self:custom.LogsFirehoseDeliveryStreamName}
+        DeliveryStreamType: DirectPut
+        ElasticsearchDestinationConfiguration:
+          IndexName: logs-${self:service}
+          IndexRotationPeriod: OneDay
+          BufferingHints:
+            IntervalInSeconds: 60
+            SizeInMBs: 1
+          DomainARN: !GetAtt LogsStoreOpenSearchDomain.Arn
+          RoleARN: !GetAtt LogsFirehoseDeliveryStreamRole.Arn
+          S3BackupMode: FailedDocumentsOnly
+          S3Configuration:
+            BucketARN: !GetAtt FailedLogsBackupS3Bucket.Arn
+            RoleARN: !GetAtt LogsFirehoseDeliveryStreamRole.Arn
+
+    FailedLogsBackupS3Bucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        AccessControl: Private
+        LifecycleConfiguration:
+          Rules:
+            - ExpirationInDays: 30
+              Status: Enabled
+        BucketName: ${self:custom.FailedLogsBackupS3BucketName}
 
     LogsStoreOpenSearchDomain:
       Type: AWS::OpenSearchService::Domain
