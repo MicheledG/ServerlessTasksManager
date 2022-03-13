@@ -9,11 +9,30 @@ The service exposes an HTTP REST API to manage "tasks" performing CRUD operation
 
 The repository contains the following resources:
 
-TODO: insert repo structure with descriptions
+TODO
 
 ## Service Architecture 
 
-TODO: insert link to architecture image
+Tasks manager service is composed by:
+
+- AWS ApiGateway HTTP API
+  - create endpoint: to create 1 task at a time
+  - list tasks: to list all the tasks stored in the internal service database (pagination is applied)
+  - delete task: to delete 1 task at a time providing the ID of the task to delete
+- Business Logic Lambda Functions
+  - createTask function: to store tasks in the database
+  - listTasks function: to retrieve tasks frome the database
+  - deleteTask function: to delete tasks in the database
+- AuhN/AuthZ layer
+  - basicAuthorizer function: to check Authorization header to be provided in the requests (Basic Auth is applied)
+- Log system
+  - CloudWatch LogGroups: to store logs produced by lambda functions (1 day retention)
+  - CloudWatch Subscription Filters: to stream logs to a dedicated Kinesis Fireshose Delivery Stream
+  - Kinesis Fireshose Delivery Stream: to ingest all the logs produced by lambda functions and batch them towards an ElasticSearch Domain
+    - kfsTransformer function: to format logs to be stored in ES Domain
+  - ES Domain: to store all the logs
+
+An architecture diagram is available in the [doc](doc/tasks-manager-architecture-background.png) folder.
 
 ## Service Deployment
 
