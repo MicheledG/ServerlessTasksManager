@@ -151,6 +151,21 @@ WARNING: if you don't see any log in the Discover page, and you've already invok
 try to extend the time range (Kibana default 15min) or invoke again the REST API (at least 1 min latency between 
 lambda functions execution and logs writing on ES is present).
 
+## Service deletion
+
+In order to remove all AWS resources created in cloud it is sufficient to launch the following command for each
+stage previously deployed.
+
+```bash
+serverless remove [\]
+  [--stage=<stage_name> \]
+  [--aws-profile=<your-aws-profile-name> \]
+  [--region=<aws-region-name>]
+```
+
+WARNING: it is possible that the removal process could require more than 30min. This huge time is due to the 
+deletion of the ElasticSearch domain.
+
 ## Service improvements
 
 This section reports some improvements that should be applied to the current solution in order to have better 
@@ -174,7 +189,6 @@ Two suggestions here are reported:
 - indices name in this service are designed to have a daily rotation (index name suffix: YYYY-MM-DD). In addition to 
   the naming convention, a policy in ES should be configured in order to delete older incides after the desired 
   retention period (e.g. 30 days) is expired.
-
 
 ### API Gateway Logging
 
