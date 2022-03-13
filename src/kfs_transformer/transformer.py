@@ -67,26 +67,63 @@ The code below will:
 8) The retry count for intermittent failures during re-ingestion is set 20 attempts. If you wish to retry fewer number
    of times for intermittent failures you can lower this value.
 """
-
+from aws_lambda_powertools import Logger
 import base64
 import json
 import gzip
 from io import BytesIO
 import boto3
+from datetime import datetime
+from os import environ
+from datetime import date
+
+logger = Logger()
+
+LOGS_INDEX_PREFIX = environ["LOGS_INDEX_PREFIX"]
 
 
-def transformLogEvent(log_event):
-    """Transform each log event.
+def transformLogEvent(data, log_event_index, log_event):
+    """Transform each log event in a section of the payload expected by ES "bulk" API.
 
-    The default implementation below just extracts the message and appends a newline to it.
+    It always creates the es_source json using information coming both from log_event and parent
+    data object (such as "accountId", "logGroup", "logStream").
+
+    Moreover, for all the log_events from the second on the es_action is added as "header".
 
     Args:
+    data (dict): Structure is {'messageType': 'DATA_MESSAGE', 'owner': '', 'logGroup': '', 'logStream': '', 'subscriptionFilters': [''], 'logEvents': [{}, {}]}
+    log_event_index (int): Index of the provided log event in the entire list of data["logEvents"]
     log_event (dict): The original log event. Structure is {"id": str, "timestamp": long, "message": str}
 
     Returns:
-    str: The transformed log event.
+    str: a new section of the "bulk" API request body.
     """
-    return log_event['message'] + '\n'
+    logger.debug(f"log event: {json.dumps(log_event)}")
+    es_action = json.dumps({
+        "index": {"_index": f"{LOGS_INDEX_PREFIX}-{date.today()}"}
+    })
+    es_source = {
+        "@id": log_event["id"],
+        "@owner": data["owner"],
+        "@log_group": data["logGroup"],
+        "@log_stream": data["logStream"],
+        "@timestamp": datetime.fromtimestamp(float(log_event["timestamp"]) / 1000.0).isoformat(),
+        "@message": str(log_event['message']).strip()
+    }
+    # check if log_event attribute is indeed a dictionary
+    # if so merge it inside es_source dict
+    try:
+        message = json.loads(str(log_event['message']).strip())
+        es_source.update(message)
+    except Exception:
+        logger.debug(f"message is not a dict")
+    es_source = json.dumps(es_source)
+    if log_event_index == 0:
+        data_to_return = f"{es_source}\n"
+    else:
+        data_to_return = f"{es_action}\n{es_source}\n"
+    logger.debug(f"data_to_return: {data_to_return}")
+    return data_to_return
 
 
 def processRecords(records):
@@ -107,7 +144,7 @@ def processRecords(records):
                 'recordId': recId
             }
         elif data['messageType'] == 'DATA_MESSAGE':
-            joinedData = ''.join([transformLogEvent(e) for e in data['logEvents']])
+            joinedData = ''.join([transformLogEvent(data, idx, e) for idx, e in enumerate(data['logEvents'])])
             dataBytes = joinedData.encode("utf-8")
             encodedData = base64.b64encode(dataBytes)
             if len(encodedData) <= 6000000:
@@ -155,7 +192,7 @@ def putRecordsToFirehoseStream(streamName, records, client, attemptsMade, maxAtt
 
     if len(failedRecords) > 0:
         if attemptsMade + 1 < maxAttempts:
-            print('Some records failed while calling PutRecordBatch to Firehose stream, retrying. %s' % (errMsg))
+            logger.warning(f'Some records failed while calling PutRecordBatch to Firehose stream, retrying: {errMsg}')
             putRecordsToFirehoseStream(streamName, failedRecords, client, attemptsMade + 1, maxAttempts)
         else:
             raise RuntimeError('Could not put records after %s attempts. %s' % (str(maxAttempts), errMsg))
@@ -188,7 +225,7 @@ def putRecordsToKinesisStream(streamName, records, client, attemptsMade, maxAtte
 
     if len(failedRecords) > 0:
         if attemptsMade + 1 < maxAttempts:
-            print('Some records failed while calling PutRecords to Kinesis stream, retrying. %s' % (errMsg))
+            logger.warning(f'Some records failed while calling PutRecords to Kinesis stream, retrying: {errMsg}')
             putRecordsToKinesisStream(streamName, failedRecords, client, attemptsMade + 1, maxAttempts)
         else:
             raise RuntimeError('Could not put records after %s attempts. %s' % (str(maxAttempts), errMsg))
@@ -208,6 +245,7 @@ def getReingestionRecord(isSas, reIngestionRecord):
         return {'Data': reIngestionRecord['data']}
 
 
+@logger.inject_lambda_context
 def lambda_handler(event, context):
     isSas = 'sourceKinesisStreamArn' in event
     streamARN = event['sourceKinesisStreamArn'] if isSas else event['deliveryStreamArn']
@@ -252,8 +290,10 @@ def lambda_handler(event, context):
             else:
                 putRecordsToFirehoseStream(streamName, recordBatch, client, attemptsMade=0, maxAttempts=20)
             recordsReingestedSoFar += len(recordBatch)
-            print('Reingested %d/%d records out of %d' % (recordsReingestedSoFar, totalRecordsToBeReingested, len(event['records'])))
+            logger.info(
+                f'Reingested {recordsReingestedSoFar}/{totalRecordsToBeReingested} '
+                f'records out of {len(event["records"])}'
+            )
     else:
-        print('No records to be reingested')
-
+        logger.info('No records to be reingested')
     return {"records": records}

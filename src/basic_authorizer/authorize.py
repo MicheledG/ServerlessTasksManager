@@ -1,10 +1,14 @@
+from aws_lambda_powertools import Logger
 import os
 from base64 import b64encode
+
+logger = Logger()
 
 BASIC_AUTH_USERNAME = os.environ['BASIC_AUTH_USERNAME']
 BASIC_AUTH_PASSWORD = os.environ['BASIC_AUTH_PASSWORD']
 
 
+@logger.inject_lambda_context
 def handler(event, context):
     # extract request authorization header
     request_authorization_header = event.get("headers", dict()).get("authorization", "")
@@ -22,4 +26,5 @@ def handler(event, context):
     response = {
         "isAuthorized": is_authorized,
     }
+    logger.debug(f"authorizer response", extra=response)
     return response

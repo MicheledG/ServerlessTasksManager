@@ -15,10 +15,12 @@ custom:
   ListTasksFunctionName: ${self:service}-${sls:stage}-listtasks
   DeleteTaskFunctionName: ${self:service}-${sls:stage}-deletetask
   BasicAuthorizerFunctionName: ${self:service}-${sls:stage}-basicauthorizer
-  KFSTransformerFunctionName: ${self:service}-${sls:stage}-kfstransformer
+  KfsTransformerFunctionName: ${self:service}-${sls:stage}-kfstransformer
   LogsFirehoseDeliveryStreamName: ${self:service}-${sls:stage}-logsdeliverystream
   FailedLogsBackupS3BucketName: ${self:service}-${sls:stage}-logsbackup
   LogsStoreOpenSearchDomainName: ${self:service}-${sls:stage}-logsstore
+  # Complete Index name = <prefix>-<YYYY>-<MM>-<DD> (in order to allow daily rotation)
+  LogsStoreIndexPrefix: ${self:service}-${sls:stage}-logs
   pythonRequirements:
     dockerizePip: true
 
@@ -111,7 +113,9 @@ functions:
     package:
       patterns:
         - src/kfs_transformer/**
-    name: ${self:custom.KFSTransformerFunctionName}
+    name: ${self:custom.KfsTransformerFunctionName}
+    environment:
+      LOGS_INDEX_PREFIX: ${self:custom.LogsStoreIndexPrefix}
 
 resources:
   Description: CloudFormation stack containing all the resources for the service ${self:service}, env ${sls:stage}
@@ -199,10 +203,10 @@ resources:
         RoleArn: !GetAtt LogsSubscriptionsRole.Arn
         LogGroupName: !Ref BasicAuthorizerLogGroup
 
-    KFSTransformerLogGroup:
+    KfsTransformerLogGroup:
       Type: AWS::Logs::LogGroup
       Properties:
-        LogGroupName: !Sub /aws/lambda/${self:custom.KFSTransformerFunctionName}
+        LogGroupName: !Sub /aws/lambda/${self:custom.KfsTransformerFunctionName}
         RetentionInDays: 1
 
     LogsFirehoseDeliveryStream:
@@ -211,9 +215,10 @@ resources:
         DeliveryStreamName: ${self:custom.LogsFirehoseDeliveryStreamName}
         DeliveryStreamType: DirectPut
         ElasticsearchDestinationConfiguration:
-          IndexName: logs-${self:service}
+          IndexName: ${self:custom.LogsStoreIndexPrefix}
           IndexRotationPeriod: OneDay
           BufferingHints:
+            # at least 1min delay between log creation on CWL and storing in ES Index
             IntervalInSeconds: 60
             SizeInMBs: 1
           DomainARN: !GetAtt LogsStoreOpenSearchDomain.Arn
@@ -224,7 +229,7 @@ resources:
               - Type: Lambda
                 Parameters:
                   - ParameterName: LambdaArn
-                    ParameterValue: !GetAtt KFSTransformerLambdaFunction.Arn
+                    ParameterValue: !GetAtt KfsTransformerLambdaFunction.Arn
           S3BackupMode: FailedDocumentsOnly
           S3Configuration:
             BucketARN: !GetAtt FailedLogsBackupS3Bucket.Arn
