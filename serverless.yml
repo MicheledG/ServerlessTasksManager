@@ -149,15 +149,6 @@ resources:
         RoleArn: !GetAtt LogsSubscriptionsRole.Arn
         LogGroupName: !Ref CreateTaskLogGroup
 
-    CreateTaskSubscriptionInvokeLambdaPermission:
-      Type: AWS::Lambda::Permission
-      Properties:
-        FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogsToElasticsearch_${self:custom.LogsStoreOpenSearchDomainName}
-        Action: lambda:InvokeFunction
-        Principal: logs.amazonaws.com
-        SourceAccount: !Ref AWS::AccountId
-        SourceArn: !GetAtt CreateTaskLogGroup.Arn
-
     ListTasksLogGroup:
       Type: AWS::Logs::LogGroup
       Properties:

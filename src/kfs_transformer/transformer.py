@@ -98,10 +98,12 @@ def transformLogEvent(data, log_event_index, log_event):
     Returns:
     str: a new section of the "bulk" API request body.
     """
-    logger.debug(f"log event: {json.dumps(log_event)}")
-    es_action = json.dumps({
-        "index": {"_index": f"{LOGS_INDEX_PREFIX}-{date.today()}"}
-    })
+    logger.debug("log event", extra={"log_event": log_event})
+    # prepare es_action
+    es_action = {"index": {"_index": f"{LOGS_INDEX_PREFIX}-{date.today()}"}}
+    logger.debug("es_action to return", extra={"es_action": es_action})
+    es_action = json.dumps(es_action)
+    # prepare es_source
     es_source = {
         "@id": log_event["id"],
         "@owner": data["owner"],
@@ -117,7 +119,9 @@ def transformLogEvent(data, log_event_index, log_event):
         es_source.update(message)
     except Exception:
         logger.debug(f"message is not a dict")
+    logger.debug("es_source to return", extra={"es_source": es_source})
     es_source = json.dumps(es_source)
+    # finalize es bulk api request section
     if log_event_index == 0:
         data_to_return = f"{es_source}\n"
     else:
