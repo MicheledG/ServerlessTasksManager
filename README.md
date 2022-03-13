@@ -9,7 +9,14 @@ The service exposes an HTTP REST API to manage "tasks" performing CRUD operation
 
 The repository contains the following resources:
 
-TODO
+- [doc](doc) folder with info regarding the empatica assignment and Tasks Manager service
+- [src](src) folder with the code for the lambda functions to deploy in cloud
+  - [tasks_manager](src/tasks_manager) folder contains the handler of the business logic functions
+  - [basic_authorizer](src/basic_authorizer) folder contains the handler of the basicAuthorizer function
+  - [kfs_transformer](src/kfs_transformer) folder contains the handler of the logs transformation logic applied to Kinesis Firehose Delivery Stream
+- [README.md](README.md) this file :)
+- [requirements.txt](requirements.txt) contains all the python packages to be used at run-time by the lambda functions
+- [serverless.yml](serverless.yml) defines all the resources to be deployed in cloud
 
 ## Service Architecture 
 
