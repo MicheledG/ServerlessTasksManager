@@ -116,7 +116,7 @@ def transformLogEvent(data, log_event_index, log_event):
     # if so merge it inside es_source dict
     try:
         message = json.loads(str(log_event['message']).strip())
-        es_source.update(message)
+        es_source["json"] = message
     except Exception:
         logger.debug(f"message is not a dict")
     logger.debug("es_source to return", extra={"es_source": es_source})

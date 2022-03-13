@@ -50,7 +50,7 @@ initialization of the ElasticSearch domain.
 
 WARNING: if the serverless client reports an error message regarding "timeout" issue (or similar) after deploy command 
 has been launched, please check that the corresponding cloudformation stack on aws is proceeding with the update.
-Cloudformation Stack name: <service_name>-<stage_name>"
+Cloudformation Stack name: "<service_name>-<stage_name>"
 
 Below the default values for some optional attributes reported above are listed:
 
