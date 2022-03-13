@@ -19,7 +19,7 @@ TODO: insert link to architecture image
 
 ### Prerequisites
 
-To deploy "tasks-manager" service it is needed ot have the following tools installed on the computer:
+To deploy "tasks-manager" service it is needed to have the following tools installed on the computer:
 
 - [Node.js and npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
 - [Serverless](https://www.serverless.com/framework/docs/getting-started)
