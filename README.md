@@ -203,6 +203,11 @@ has public subnets.
 
 It is recommended to create ad hoc network configurations based on project requirements. 
 
+### Least Privilege Principle
+
+The permissions attached to the IAM role "LogsFirehoseDeliveryStreamRole" defined in the 
+[serverless.yml](serverless.yml) should be restricted considering only the target resources.  
+
 ### Environment Mgmt
 
 The serverless.yml template is not differentiating resources configuration (such as: Lambda Function MEM, ES Domain 
