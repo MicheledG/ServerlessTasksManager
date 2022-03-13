@@ -30,6 +30,8 @@ Tasks manager service is composed by:
   - createTask function: to store tasks in the database
   - listTasks function: to retrieve tasks frome the database
   - deleteTask function: to delete tasks in the database
+- Data Store layer
+  - DynamoDB table: to store created tasks
 - AuhN/AuthZ layer
   - basicAuthorizer function: to check Authorization header to be provided in the requests (Basic Auth is applied)
 - Log system
