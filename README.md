@@ -1,15 +1,13 @@
 # Serverless REST API for Tasks Mgmt
 
-This repository contains the definition of a Serverless service named "tasks-manager" that implements the requirements 
-specified by Empatica in the second assignment described in the interview assignment [doc](doc/assignment.pdf). 
-
-The service exposes an HTTP REST API to manage "tasks" performing CRUD operations on a database.
+This repository contains the definition of a Serverless service named "tasks-manager".
+The service exposes an HTTP REST API to manage "tasks" performing CRUD operations on a NoSQL database.
 
 ## Repo Structure
 
 The repository contains the following resources:
 
-- [doc](doc) folder with info regarding the empatica assignment and Tasks Manager service
+- [doc](doc) folder with info regarding the implemented service
 - [src](src) folder with the code for the lambda functions to deploy in cloud
   - [tasks_manager](src/tasks_manager) folder contains the handler of the business logic functions
   - [basic_authorizer](src/basic_authorizer) folder contains the handler of the basicAuthorizer function
@@ -95,7 +93,7 @@ You can create, retrieve, or delete tasks with the following commands:
 #### Create a Task
 
 ```bash
-curl -X POST -u <basic_auth_usr>:<basic_auth_pwd> "https://XXXXXXX.execute-api.<aws-region-name>.amazonaws.com/<stage_name>/tasks" --data '{ "description": "Complete Empatica assignment #02" }'
+curl -X POST -u <basic_auth_usr>:<basic_auth_pwd> "https://XXXXXXX.execute-api.<aws-region-name>.amazonaws.com/<stage_name>/tasks" --data '{ "description": "this is the first task" }'
 ```
 
 No output
